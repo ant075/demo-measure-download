@@ -87,15 +87,9 @@ def download_once(
         error_message = f"ошибка: {error}"
     finally:
         if received:
-            progress(
-                attempt,
-                received,
-                download_elapsed,
-            )
+            progress(attempt, received, download_elapsed)
         if error_message:
-            print(
-                f"\rПопытка {attempt}/{ATTEMPTS}: {error_message}, "
-                f"{download_elapsed:.3f} с"
+            print(f"\rПопытка {attempt}/{ATTEMPTS}: {error_message}, {download_elapsed:.3f} с"
             )
         elif received:
             print()
