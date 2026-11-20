@@ -17,15 +17,27 @@ ATTEMPTS = 10
 CHUNK_SIZE = 1024 * 1024
 
 
-def progress(attempt: int, received: int, started: float) -> None:
-    elapsed = max(time.monotonic() - started, 1e-12)
+def progress(
+    attempt: int, received: int, started: float, elapsed: float | None = None
+) -> None:
+    elapsed = max(
+        time.monotonic() - started if elapsed is None else elapsed,
+        1e-12,
+    )
     speed = received / elapsed / 1_000_000
-    print(f"\rПопытка {attempt}/{ATTEMPTS}: {speed:.2f} МБ/с", end="", flush=True)
+    print(
+        f"\rПопытка {attempt}/{ATTEMPTS}: {speed:.2f} МБ/с, "
+        f"{elapsed:.3f} с, {received} байт",
+        end="",
+        flush=True,
+    )
 
 
 def download_once(url: str, attempt: int, totals: list[int], files: set[Path]) -> float:
     started = time.monotonic()
     received = 0
+    download_elapsed: float | None = None
+    error_message: str | None = None
     try:
         request = Request(url, headers={"User-Agent": "TestDownloader/1.0 (https://example.com)"})
         with urlopen(request) as response:
@@ -45,17 +57,29 @@ def download_once(url: str, attempt: int, totals: list[int], files: set[Path]) -
                     progress(attempt, received, started)
 
         files.add(target)
-        return time.monotonic() - started
+        download_elapsed = time.monotonic() - started
+        return download_elapsed
     except KeyboardInterrupt:
         raise
     except HTTPError as error:
-        print(f"\rПопытка {attempt}/{ATTEMPTS}: HTTP-ошибка {error.code}")
-        return time.monotonic() - started
+        error_message = f"HTTP-ошибка {error.code}"
     except (OSError, URLError, ValueError, RuntimeError) as error:
-        print(f"\rПопытка {attempt}/{ATTEMPTS}: ошибка: {error}")
-        return time.monotonic() - started
+        error_message = f"ошибка: {error}"
     finally:
         if received:
+            progress(
+                attempt,
+                received,
+                started,
+                download_elapsed or (time.monotonic() - started),
+            )
+        elapsed = download_elapsed or (time.monotonic() - started)
+        if error_message:
+            print(
+                f"\rПопытка {attempt}/{ATTEMPTS}: {error_message}, "
+                f"{elapsed:.3f} с"
+            )
+        elif received:
             print()
 
 
