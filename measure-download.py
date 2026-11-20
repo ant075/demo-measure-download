@@ -17,13 +17,8 @@ CHUNK_SIZE = 1024 * 1024
 USER_AGENT = 'TestDownloader/1.0 (https://example.com)'
 
 
-def progress(
-    attempt: int, received: int, started: float, elapsed: float | None = None
-) -> None:
-    elapsed = max(
-        time.monotonic() - started if elapsed is None else elapsed,
-        1e-12,
-    )
+def progress(attempt: int, received: int, elapsed: float) -> None:
+    elapsed = max(elapsed, 1e-12)
     speed = received / elapsed / 1_000_000
     print(
         f"\rПопытка {attempt}/{ATTEMPTS}: {speed:.2f} МБ/с, "
@@ -36,9 +31,8 @@ def progress(
 def download_once(
     url: str, attempt: int, target: Path
 ) -> tuple[float, int, bool]:
-    started = time.monotonic()
     received = 0
-    download_elapsed: float | None = None
+    download_elapsed = 0.0
     error_message: str | None = None
     try:
         request = Request(url, headers={"User-Agent": USER_AGENT})
@@ -49,14 +43,17 @@ def download_once(
 
             with target.open("wb") as output:
                 while True:
-                    chunk = response.read(CHUNK_SIZE)
+                    read_started = time.monotonic()
+                    try:
+                        chunk = response.read(CHUNK_SIZE)
+                    finally:
+                        download_elapsed += time.monotonic() - read_started
                     if not chunk:
                         break
                     output.write(chunk)
                     received += len(chunk)
-                    progress(attempt, received, started)
+                    progress(attempt, received, download_elapsed)
 
-        download_elapsed = time.monotonic() - started
         return download_elapsed, received, True
     except KeyboardInterrupt:
         raise
@@ -69,19 +66,17 @@ def download_once(
             progress(
                 attempt,
                 received,
-                started,
-                download_elapsed or (time.monotonic() - started),
+                download_elapsed,
             )
-        elapsed = download_elapsed or (time.monotonic() - started)
         if error_message:
             print(
                 f"\rПопытка {attempt}/{ATTEMPTS}: {error_message}, "
-                f"{elapsed:.3f} с"
+                f"{download_elapsed:.3f} с"
             )
         elif received:
             print()
 
-    return time.monotonic() - started, received, False
+    return download_elapsed, received, False
 
 
 def parse_args() -> argparse.Namespace:
