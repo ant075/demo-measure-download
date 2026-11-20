@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 
-ATTEMPTS = 3
+ATTEMPTS = 10
 CHUNK_SIZE = 1024 * 1024
 READ_TIMEOUT_SECONDS = 30.0
 DOWNLOAD_TIMEOUT_SECONDS = 300.0
