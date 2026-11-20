@@ -28,9 +28,18 @@ def progress(attempt: int, received: int, elapsed: float) -> None:
     )
 
 
+def initial_progress(attempt: int) -> None:
+    print(
+        f"\rПопытка {attempt}/{ATTEMPTS}: —, 0.000 с, 0 байт",
+        end="",
+        flush=True,
+    )
+
+
 def download_once(
     url: str, attempt: int, target: Path
 ) -> tuple[float, int, bool]:
+    initial_progress(attempt)
     received = 0
     download_elapsed = 0.0
     error_message: str | None = None
@@ -75,6 +84,8 @@ def download_once(
             )
         elif received:
             print()
+        else:
+            print(f"\rПопытка {attempt}/{ATTEMPTS}: —, {download_elapsed:.3f} с, 0 байт")
 
     return download_elapsed, received, False
 
