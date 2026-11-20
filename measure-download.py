@@ -13,6 +13,8 @@ from urllib.request import Request, urlopen
 
 ATTEMPTS = 3
 CHUNK_SIZE = 1024 * 1024
+READ_TIMEOUT_SECONDS = 30.0
+DOWNLOAD_TIMEOUT_SECONDS = 300.0
 # Такой User-Agent позволяет скачать по прямой ссылке с ресурсов вроде wikimedia.org
 USER_AGENT = 'TestDownloader/1.0 (https://example.com)'
 
@@ -40,28 +42,41 @@ def download_once(
     url: str, attempt: int, target: Path
 ) -> tuple[float, int, bool]:
     initial_progress(attempt)
+    deadline = time.monotonic() + DOWNLOAD_TIMEOUT_SECONDS
     received = 0
     download_elapsed = 0.0
     error_message: str | None = None
     try:
         request = Request(url, headers={"User-Agent": USER_AGENT})
-        with urlopen(request) as response:
+        with urlopen(request, timeout=READ_TIMEOUT_SECONDS) as response:
             status = response.status if hasattr(response, "status") else response.getcode()
             if not 200 <= status < 300:
                 raise RuntimeError(f"HTTP status {status}")
 
             with target.open("wb") as output:
-                while True:
-                    read_started = time.monotonic()
-                    try:
-                        chunk = response.read(CHUNK_SIZE)
-                    finally:
-                        download_elapsed += time.monotonic() - read_started
-                    if not chunk:
-                        break
-                    output.write(chunk)
-                    received += len(chunk)
-                    progress(attempt, received, download_elapsed)
+                chunk = b""
+                go_on = True
+                deadline_expired = False
+                while go_on:
+                    if time.monotonic() >= deadline:
+                        deadline_expired = True
+                    else:
+                        read_started = time.monotonic()
+                        try:
+                            chunk = response.read(CHUNK_SIZE)
+                        finally:
+                            download_elapsed += time.monotonic() - read_started
+                        if chunk:
+                            output.write(chunk)
+                            received += len(chunk)
+                            progress(attempt, received, download_elapsed)
+                    go_on = go_on and bool(chunk) and not deadline_expired
+
+                if deadline_expired:
+                    raise TimeoutError(
+                        f"превышено общее время загрузки "
+                        f"({DOWNLOAD_TIMEOUT_SECONDS:.0f} с)"
+                    )
 
         return download_elapsed, received, True
     except KeyboardInterrupt:
