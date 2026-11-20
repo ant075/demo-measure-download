@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Download an HTTP resource ten times and report timing and throughput."""
+"""Десять раз скачать HTTP-ресурс и вывести объём, среднее время и скорость загрузки."""
 
 import argparse
 import sys
