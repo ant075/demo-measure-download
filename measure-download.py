@@ -11,8 +11,10 @@ from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 
-ATTEMPTS = 10
+ATTEMPTS = 3
 CHUNK_SIZE = 1024 * 1024
+# Такой User-Agent позволяет скачать по прямой ссылке с ресурсов вроде wikimedia.org
+USER_AGENT = 'TestDownloader/1.0 (https://example.com)'
 
 
 def progress(
@@ -39,7 +41,7 @@ def download_once(
     download_elapsed: float | None = None
     error_message: str | None = None
     try:
-        request = Request(url, headers={"User-Agent": "TestDownloader/1.0 (https://example.com)"})
+        request = Request(url, headers={"User-Agent": USER_AGENT})
         with urlopen(request) as response:
             status = response.status if hasattr(response, "status") else response.getcode()
             if not 200 <= status < 300:
