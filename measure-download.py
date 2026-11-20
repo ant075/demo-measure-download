@@ -27,7 +27,7 @@ def download_once(url: str, attempt: int, totals: list[int], files: set[Path]) -
     started = time.monotonic()
     received = 0
     try:
-        request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        request = Request(url, headers={"User-Agent": "TestDownloader/1.0 (https://example.com)"})
         with urlopen(request) as response:
             status = response.status if hasattr(response, "status") else response.getcode()
             if not 200 <= status < 300:
