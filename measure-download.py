@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 """Download an HTTP resource ten times and report timing and throughput."""
 
-from __future__ import annotations
-
 import argparse
 import sys
 import time
@@ -33,7 +31,9 @@ def progress(
     )
 
 
-def download_once(url: str, attempt: int, totals: list[int], files: set[Path]) -> float:
+def download_once(
+    url: str, attempt: int, target: Path
+) -> tuple[float, int, bool]:
     started = time.monotonic()
     received = 0
     download_elapsed: float | None = None
@@ -45,7 +45,6 @@ def download_once(url: str, attempt: int, totals: list[int], files: set[Path]) -
             if not 200 <= status < 300:
                 raise RuntimeError(f"HTTP status {status}")
 
-            target = Path.cwd() / "download"
             with target.open("wb") as output:
                 while True:
                     chunk = response.read(CHUNK_SIZE)
@@ -53,12 +52,10 @@ def download_once(url: str, attempt: int, totals: list[int], files: set[Path]) -
                         break
                     output.write(chunk)
                     received += len(chunk)
-                    totals[0] += len(chunk)
                     progress(attempt, received, started)
 
-        files.add(target)
         download_elapsed = time.monotonic() - started
-        return download_elapsed
+        return download_elapsed, received, True
     except KeyboardInterrupt:
         raise
     except HTTPError as error:
@@ -82,6 +79,8 @@ def download_once(url: str, attempt: int, totals: list[int], files: set[Path]) -
         elif received:
             print()
 
+    return time.monotonic() - started, received, False
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Скачать URL десять раз")
@@ -95,23 +94,25 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    target = Path.cwd() / "download"
     total_time = 0.0
-    totals = [0]
-    files: set[Path] = set()
+    total_bytes = 0
+    saved_anything = False
 
     try:
         for attempt in range(1, ATTEMPTS + 1):
-            total_time += download_once(args.url, attempt, totals, files)
+            elapsed, received, completed = download_once(args.url, attempt, target)
+            total_time += elapsed
+            total_bytes += received
+            saved_anything = saved_anything or completed
     except KeyboardInterrupt:
         print("\nПрервано пользователем.", file=sys.stderr)
         return 130
 
     print(f"Среднее время попытки: {total_time / ATTEMPTS:.3f} с")
-    print(f"Объём скачанных данных: {totals[0]} байт")
-    if files:
-        print("Сохранённые файлы:")
-        for path in sorted(files):
-            print(f"- {path.name}")
+    print(f"Объём скачанных данных: {total_bytes} байт")
+    if saved_anything:
+        print(f"Сохранённый файл: {target}")
     else:
         print("Сохранённых файлов нет.")
     return 0
